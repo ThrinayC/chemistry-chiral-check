@@ -255,7 +255,7 @@ html, body, [data-testid="stAppViewContainer"] {
 
 
 PRESET_MOLECULES = {
-    "Cocaine":          "COC(=O)[C@H]1[C@@H]2CC[C@@H](C1)N2C",
+    "Cocaine": "CN1[C@H]2CC[C@@H]1C[C@H](OC(=O)c1ccccc1)[C@@H]2OC(=O)C",
     "Loxoprofen":       "OC(=O)[C@@H](C)c1ccc(CC2CCCC2=O)cc1",
     "L-Alanine":        "N[C@@H](C)C(=O)O",
     "D-Alanine":        "N[C@H](C)C(=O)O",
