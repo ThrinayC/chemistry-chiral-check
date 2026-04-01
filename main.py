@@ -2,7 +2,11 @@ import streamlit as st
 from rdkit import Chem
 from rdkit.Chem import Draw, AllChem
 from rdkit.Chem.Draw import rdMolDraw2D
+from urllib.parse import quote
 import json
+import requests
+
+
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -249,21 +253,29 @@ html, body, [data-testid="stAppViewContainer"] {
 """, unsafe_allow_html=True)
 
 
-# ── Preset molecules ──────────────────────────────────────────────────────────
+
 PRESET_MOLECULES = {
+    "Cocaine":          "COC(=O)[C@H]1[C@@H]2CC[C@@H](C1)N2C",
     "Loxoprofen":       "OC(=O)[C@@H](C)c1ccc(CC2CCCC2=O)cc1",
     "L-Alanine":        "N[C@@H](C)C(=O)O",
     "D-Alanine":        "N[C@H](C)C(=O)O",
     "L-Phenylalanine":  "N[C@@H](Cc1ccccc1)C(=O)O",
     "Glucose (D)":      "OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O",
-    "Cocaine":          "COC(=O)[C@H]1[C@@H]2CC[C@@H](C1)N2C",
     "Thalidomide":      "O=C1CCC(=O)N1[C@@H]1C(=O)Nc2ccccc21",
     "Ibuprofen (S)":    "CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O",
     "Limonene (R)":     "CC(=C)[C@@H]1CCC(=CC1)C",
     "Camphor":          "O=C1C[C@@H]2CC1(C)C2(C)C",
     "Aspartame":        "COC(=O)[C@@H](Cc1ccccc1)NC(=O)[C@@H](N)CC(=O)O",
-    "Penicillin G":     "O=C(O)[C@@H]1[C@H]2SC(C)(C)[C@@H](N2C1=O)C(=O)Nc1ccccc1",
+    "Penicillin G":     "CC1([C@@H](N2[C@H](S1)[C@@H](C2=O)NC(=O)Cc1ccccc1)C(=O)O)C",
+    # ── New additions ──────────────────────────────────────────────────────
+    "Naproxen":         "COc1ccc2cc([C@@H](C)C(=O)O)ccc2c1",
+    "Amoxicillin":      "CC1([C@@H](N2[C@H](S1)[C@@H](C2=O)NC(=O)[C@@H](N)c1ccc(O)cc1)C(=O)O)C",
+    "Morphine":         "[C@@H]1(O)([C@]23CCN(CC2=CC=C[C@H]3O1)C)",
+    "Taxol (Paclitaxel)": "OC(=O)[C@@H]1C[C@]2(OC(=O)c3ccccc3)[C@H](OC(C)=O)[C@@H](O)[C@@]4(C)[C@@H](OC(=O)[C@H](O)[C@@H](NC(=O)c3ccccc3)c3ccccc3)CC[C@]4(C)[C@H]2[C@@H]1C",
+    "Testosterone":     "O=C1CC[C@H]2[C@@H]3CC[C@@](O)(C(=O)C)[C@@H]3CC[C@@H]2[C@@H]1",
+    "Carvone (R)":      "O=C1CC(=C)[C@@H](CC1)C(=C)C",
 }
+
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -273,6 +285,36 @@ def get_chiral_info(mol):
     return [{"idx": idx, "symbol": mol.GetAtomWithIdx(idx).GetSymbol(), "config": cfg}
             for idx, cfg in centres]
 
+def name_to_smiles(name):
+    try:
+        encoded = quote(name.strip())
+        # Step 1: get CID
+        cid_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{encoded}/cids/JSON"
+        r = requests.get(cid_url, timeout=10)
+        if r.status_code != 200:
+            return None
+        cid = r.json()["IdentifierList"]["CID"][0]
+
+        # Step 2: get SDF with 3D coords (has full stereo info)
+        sdf_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/SDF?record_type=3d"
+        r2 = requests.get(sdf_url, timeout=10)
+        if r2.status_code == 200:
+            # parse SDF and extract SMILES with stereo assigned from 3D
+            mol = Chem.MolFromMolBlock(r2.text, removeHs=False)
+            if mol:
+                AllChem.AssignStereochemistryFrom3D(mol)
+                Chem.AssignStereochemistry(mol, cleanIt=True, force=True)
+                return Chem.MolToSmiles(mol, isomericSmiles=True)
+
+        # Step 3: fallback to plain SMILES if no 3D available
+        smi_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/IsomericSMILES/JSON"
+        r3 = requests.get(smi_url, timeout=10)
+        if r3.status_code == 200:
+            props = r3.json()["PropertyTable"]["Properties"][0]
+            return props.get("IsomericSMILES") or props.get("SMILES")
+        return None
+    except Exception as e:
+        return None
 
 def mol_to_svg(mol, width=600, height=400, highlight_atoms=None, highlight_colors=None):
     AllChem.Compute2DCoords(mol)
@@ -628,10 +670,25 @@ with col_in:
     default_smiles = PRESET_MOLECULES.get(preset, "") if preset != "— enter SMILES —" else ""
     smiles_input = st.text_input(
         "SMILES string",
-        value=default_smiles,
+        value=st.session_state.get("fetched_smiles", default_smiles),
         placeholder="e.g.  N[C@@H](C)C(=O)O",
         label_visibility="collapsed",
     )
+    col_name, col_fetch = st.columns([3, 1])
+    with col_name:
+        mol_name = st.text_input("Or search by name", placeholder="e.g. aspirin, dopamine, caffeine")
+    with col_fetch:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔍 Fetch SMILES"):
+            if mol_name.strip():
+                with st.spinner("Fetching from PubChem..."):
+                    fetched = name_to_smiles(mol_name.strip())
+                if fetched:
+                    st.session_state["fetched_smiles"] = fetched
+                    st.success(f"Found: `{fetched}`")
+                else:
+                    st.markdown("<div class='error-box'>✗ Molecule not found on PubChem.</div>",
+                                unsafe_allow_html=True)
 
 col_btn, _ = st.columns([1, 3])
 with col_btn:
