@@ -1234,7 +1234,7 @@ if not st.session_state["welcome_shown"]:
                     <p class="splash-sub">STEREOCID EXPLORER</p>
                     <div class="splash-info">
                         <span style="color: #8a90a8; font-size: 0.9rem;">Project Developed By:</span><br>
-                        <b style="font-size: 1.5rem; color: #00e5a0; display: block; margin-bottom: 5px;">C Thrinay Kumar</b>
+                        <b style="font-size: 1.5rem; color: #00e5a0; display: block; margin-bottom: 5px;">C Thrinay </b>
                         <code style="color: #7b61ff; background: transparent; font-size: 1rem;">RA2511026050052</code><br>
                         <span style="font-size: 0.9rem; color: #8a90a8; display: block; margin-top: 10px;">Class: AIML - "A"</span>
                     </div>
