@@ -160,7 +160,8 @@ html, body, [data-testid="stAppViewContainer"] {
 .stTextArea > div > div > textarea:focus {
     border-color: var(--accent) !important;
     box-shadow: 0 0 0 3px rgba(0,229,160,.15) !important;
-}
+
+
 .stButton > button {
     background: linear-gradient(135deg, var(--accent), var(--accent3)) !important;
     color: #000 !important;
