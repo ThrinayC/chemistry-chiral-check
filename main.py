@@ -47,6 +47,7 @@ html, body, [data-testid="stAppViewContainer"] {
 
 [data-testid="stSidebar"] * { color: var(--text) !important; }
 
+
 .hero {
     text-align: center;
     padding: 2.5rem 1rem 1.5rem;
